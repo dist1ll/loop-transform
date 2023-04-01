@@ -1,85 +1,71 @@
-use std::{arch::asm, hint::black_box, sync::atomic::compiler_fence, time::Instant};
+#![allow(dead_code)]
+#![allow(unused)]
+
+use std::{
+    arch::asm,
+    collections::BTreeSet,
+    hint::black_box,
+    sync::atomic::compiler_fence,
+    time::{Duration, Instant},
+};
+
+use rand::Rng;
+
+struct Args {
+    first: bool,
+}
+
+const COUNT: usize = 2048;
 
 fn main() {
-    const COUNT: usize = 2048;
+    let mut args: BTreeSet<_> = std::env::args_os()
+        .skip(1)
+        .map(|e| e.into_string().unwrap())
+        .collect();
+    // generate random data
+    let mut data = [1f32; COUNT];
+    let mut rng = rand::thread_rng();
+    for val in data.iter_mut() {
+        *val = rng.gen();
+    }
+    // call benchmark
+    if args.contains("--first") {
+        first(&mut data);
+    } else if args.contains("--second") {
+        second(&mut data);
+    } else {
+        println!("\x1b[0;31mError:\x1b[0m argument missing: '--first'");
+        std::process::exit(0);
+    }
+}
 
-    // // First version
-    // let mut data = [1f32; COUNT];
-    // let start = Instant::now();
-    // data.iter_mut().for_each(|d| {
-    //     (0..300000u64).into_iter().for_each(|_| {
-    //         if *d > 0.5f32 {
-    //             *d *= 0.499f32;
-    //         } else {
-    //             *d *= 0.501f32;
-    //         }
-    //     })
-    // });
-    // let elapsed = start.elapsed();
-    // println!("first version:   {elapsed:?}");
-    // black_box(data);
-
-    // // divider
-    // unsafe { asm!("nop; ") }
-    // compiler_fence(std::sync::atomic::Ordering::SeqCst);
-
-    // // Second version
-    // let mut data = [1f32; COUNT];
-    // let start = Instant::now();
-    // (0..300000u64).into_iter().for_each(|_| {
-    //     data.iter_mut().for_each(|d| {
-    //         if *d > 0.5f32 {
-    //             *d *= 0.499f32;
-    //         } else {
-    //             *d *= 0.501f32;
-    //         }
-    //     })
-    // });
-    // let elapsed = start.elapsed();
-    // println!("second version:  {elapsed:?}");
-    // black_box(data);
-
-    // // divider
-    // unsafe { asm!("nop; ") }
-    // compiler_fence(std::sync::atomic::Ordering::SeqCst);
-
-    // Third version
-    let mut data = [1u32; COUNT];
-    let start = Instant::now();
+#[inline(never)]
+pub fn first(data: &mut [f32; COUNT]) {
     let mut i = 0;
-    while i < 300000u64 {
+    while i < 3000000u64 {
         for d in data.iter_mut() {
-            if *d % 5 != 0 {
-                *d += 7;
+            if *d > 0.5f32 {
+                *d *= 0.492f32;
             } else {
-                *d -= 1;
+                *d *= 0.5012f32;
             }
         }
         i += 1;
     }
-    let elapsed = start.elapsed();
-    println!("third version:  {elapsed:?}");
     black_box(data);
+}
 
-    // divider
-    unsafe { asm!("nop; ") }
-    compiler_fence(std::sync::atomic::Ordering::SeqCst);
-
-    // Fourth version
-    let mut data = [1u32; COUNT];
-    let start = Instant::now();
-    let mut i = 0;
-    for d in data.iter_mut() {
-        while i < 300000u64 {
-            if *d % 5 != 0 {
-                *d += 7;
+#[inline(never)]
+pub fn second(data: &mut [f32; COUNT]) {
+    const COUNT: usize = 2048;
+    (0..3000000u64).into_iter().for_each(|_| {
+        data.iter_mut().for_each(|d| {
+            if *d > 0.5f32 {
+                *d *= 0.492f32;
             } else {
-                *d -= 1;
+                *d *= 0.5012f32;
             }
-            i += 1;
-        }
-    }
-    let elapsed = start.elapsed();
-    println!("fourth version: {elapsed:?}");
+        });
+    });
     black_box(data);
 }
